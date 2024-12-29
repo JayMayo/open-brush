@@ -220,12 +220,12 @@ namespace TiltBrush
             cameraRig.disableEyeAnchorCameras = true;
 
             //Get Oculus ID
-            var appId = App.Config.OculusSecrets.ClientId;
+            var appId = App.Config.OculusSecrets?.ClientId;
 #if UNITY_ANDROID
-            appId = App.Config.OculusMobileSecrets.ClientId;
+            appId = App.Config.OculusMobileSecrets?.ClientId;
 #endif
 
-            if (Unity.XR.Oculus.Utils.GetSystemHeadsetType() != Unity.XR.Oculus.SystemHeadset.Oculus_Quest)
+            if (appId != null && Unity.XR.Oculus.Utils.GetSystemHeadsetType() != Unity.XR.Oculus.SystemHeadset.Oculus_Quest)
             {
                 Oculus.Platform.Core.Initialize(appId);
                 Oculus.Platform.UserAgeCategory.Get().OnComplete((msg) => {

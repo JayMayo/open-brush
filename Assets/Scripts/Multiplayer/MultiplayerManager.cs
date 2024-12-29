@@ -118,7 +118,9 @@ namespace OpenBrush.Multiplayer
         void Start()
         {
 #if OCULUS_SUPPORTED
-            OVRPlatform.Users.GetLoggedInUser().OnComplete((msg) => {
+            // GetLoggedInUser can return null
+            // if Oculus.Platform.Core isn't initialized
+            OVRPlatform.Users.GetLoggedInUser()?.OnComplete((msg) => {
                 if (!msg.IsError)
                 {
                     myOculusUserId = msg.GetUser().ID;
@@ -146,7 +148,7 @@ namespace OpenBrush.Multiplayer
                     m_VoiceManager = new PhotonVoiceManager(this);
                     if (m_VoiceManager != null) ControllerConsoleScript.m_Instance.AddNewLine("PhotonVoiceManager Loaded");
                     else ControllerConsoleScript.m_Instance.AddNewLine("PhotonVoiceManager Not Loaded");
-#endif 
+#endif
                     break;
                 default:
                     return;
@@ -299,7 +301,7 @@ namespace OpenBrush.Multiplayer
             // Find the room with the given name
             RoomData? room = m_RoomData.FirstOrDefault(r => r.roomName == roomName);
 
-            // Room exists 
+            // Room exists
             RoomData r = (RoomData)room;
             if (r.numPlayers == 0) isUserRoomOwner = true;// and is empty user becomes room owner
             else isUserRoomOwner = false; // not empty user is not the room owner
@@ -399,9 +401,9 @@ namespace OpenBrush.Multiplayer
 
         void OnLocalPlayerJoined(int id, ITransientData<PlayerRigData> playerData)
         {
-            // the user is the room owner if is the firt to get in 
+            // the user is the room owner if is the firt to get in
             isUserRoomOwner = m_Manager.GetPlayerCount() == 1 ? true : false;
-            // if not room owner clear scene 
+            // if not room owner clear scene
             if (!isUserRoomOwner) SketchMemoryScript.m_Instance.ClearMemory();
 
             m_LocalPlayer = playerData;
@@ -445,7 +447,7 @@ namespace OpenBrush.Multiplayer
                 }
             }
 
-            // Reassign Ownership if needed 
+            // Reassign Ownership if needed
             // Check if any remaining player is the room owner
             bool anyRoomOwner = m_RemotePlayers.Any(player => m_Manager.GetPlayerRoomOwnershipStatus(player.PlayerId))
                                 || isUserRoomOwner;
