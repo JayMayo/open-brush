@@ -82,7 +82,7 @@ public class VrStylusHandler : StylusHandler
         // Find whether the Logitech MX Ink is on the left or the right hand
         bool stylusIsOnLeftHand = leftDevice.Contains("logitech");
         bool stylusIsOnRightHand = rightDevice.Contains("logitech");
-        // Debug.Log($"Device: Left hand: {leftDevice}, Right hand: {rightDevice}");
+        Debug.Log($"Logitech MX Stylus: Left hand: {leftDevice}, Right hand: {rightDevice}");
         // Flag the stylus as active/inactive, on right/left hand
         _stylus.isActive = stylusIsOnLeftHand || stylusIsOnRightHand;
         _stylus.isOnRightHand = stylusIsOnRightHand;
