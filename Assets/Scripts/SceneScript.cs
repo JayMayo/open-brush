@@ -242,7 +242,7 @@ namespace TiltBrush
 
         public CanvasScript AddLayerNow()
         {
-            var go = new GameObject(string.Format("Track {0} Frame {1}", LayerCanvases.Count(), animationUI_manager.GetFrameOn()));
+            var go = new GameObject(string.Format("Layer {0}", LayerCanvases.Count()));
             go.transform.parent = transform;
             Coords.AsLocal[go.transform] = TrTransform.identity;
             go.transform.hasChanged = false;
@@ -262,19 +262,6 @@ namespace TiltBrush
         public CanvasScript AddCanvas()
         {
             var go = new GameObject("new");
-            go.transform.parent = transform;
-            Coords.AsLocal[go.transform] = TrTransform.identity;
-            go.transform.hasChanged = false;
-            HierarchyUtils.RecursivelySetLayer(go.transform, App.Scene.MainCanvas.gameObject.layer);
-            var frame = go.AddComponent<CanvasScript>();
-                Debug.Log(frame.name); // TO SEE IF AddCanvas is run again when loading
-            return frame;
-        }
-
-        public CanvasScript AddCanvas(int intTrack, int intFrame)
-        {
-            string name = string.Format("Track {0} Frame {1}", intTrack, intFrame);
-            var go = new GameObject(name);
             go.transform.parent = transform;
             Coords.AsLocal[go.transform] = TrTransform.identity;
             go.transform.hasChanged = false;
