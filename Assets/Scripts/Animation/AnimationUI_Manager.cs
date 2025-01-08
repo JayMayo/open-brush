@@ -159,6 +159,11 @@ namespace TiltBrush.FrameAnimation
             m_PreviousShowingFrame = frameIndex;
         }
 
+        public int GetFrameOn()
+        {
+            return FrameOn; // so we can get the Frame number from SceneScript to label the Canvases
+        }
+
         public bool GetFrameFilled(int track, int frame)
         {
             return Timeline[track].Frames[frame].Canvas.gameObject.transform.childCount > 0;
@@ -244,6 +249,35 @@ namespace TiltBrush.FrameAnimation
 
         public void AddLayerRefresh(CanvasScript canvasAdding)
         {
+            Debug.Log("We need to update AddLayerRefresh as this is also adding empty frames when creating new layer");
+            /* 
+            
+            Track addingTrack = NewTrack();
+            addingFrame = NewFrame(canvasAdding); // Canvas already created from AddLayerNow() in SceneScripts.cs
+
+            for (int i = 0; i < GetTimelineLength(); i++)
+            {
+                // extend the addingFrame here
+            }
+            addingTrack.Frames.Add(addingFrame); // set the track to the extended layer from the loop
+            
+            Timeline.Add(addingTrack);
+            ResetTimeline();
+            */
+            // canvasAdding.gameObject.SetActive(true); // Tried using this if it can set this up as a "live" frame. No.
+            CanvasScript canvasFill;
+            Track addingTrack = NewTrack();
+            Frame addingFrame;
+            for (int i = 0; i < GetTimelineLength(); i++)
+            {
+                canvasFill = App.Scene.AddCanvas(Timeline.Count, i);    
+                addingFrame = NewFrame(i == FrameOn ? canvasAdding : canvasFill);
+                if (i == FrameOn) {App.Scene.ActiveCanvas = addingFrame.Canvas;} 
+                addingTrack.Frames.Add(addingFrame);
+            }            
+            Timeline.Add(addingTrack);
+            ResetTimeline();
+            /*
             Track addingTrack = NewTrack();
 
             for (int i = 0; i < GetTimelineLength(); i++)
@@ -254,6 +288,7 @@ namespace TiltBrush.FrameAnimation
             }
             Timeline.Add(addingTrack);
             ResetTimeline();
+            */
         }
 
         public (int, int) GetCanvasLocation(CanvasScript canvas)
@@ -661,6 +696,10 @@ namespace TiltBrush.FrameAnimation
 
         public DeletedFrame RemoveKeyFrame(int trackNum = -1, int frameNum = -1)
         {
+            if (trackNum == 0){
+                Debug.Log("Modifying MainCanvas that's not extending/reducing. DON'T DO THAT!");
+            }
+
             (int, int) index = (trackNum == -1 || frameNum == -1) ? GetCanvasLocation(App.Scene.ActiveCanvas) : (trackNum, frameNum);
             (int, int) nextIndex = GetFollowingFrameIndex(index.Item1, index.Item2);
 
@@ -671,13 +710,23 @@ namespace TiltBrush.FrameAnimation
             deletedFrame.Length = GetFrameLength(index.Item1, index.Item2);
             deletedFrame.Location = (index.Item1, index.Item2);
 
-            App.Scene.HideCanvas(Timeline[index.Item1].Frames[index.Item2].Canvas);
-            CanvasScript replacingCanvas = App.Scene.AddCanvas();
+
+            Debug.Log("Running GetTrackCanvases in RemoveKeyFrame before AddCanvas");
+            GetTrackCanvases();
+            
+            App.Scene.ClearLayerContents(deletedFrame.Frame.Canvas); // without this, it will error out in SketchWriter.cs:EnumerateAdjustedSnapshots()
+            App.Scene.HideCanvas(deletedFrame.Frame.Canvas); //App.Scene.HideCanvas(Timeline[index.Item1].Frames[index.Item2].Canvas);
+
+            // CanvasScript replacingCanvas = App.Scene.AddCanvas(); // move inside of loop
+            Debug.Log("public DeletedFrame RemoveKeyFrame" + " : AddCanvas function will run in loop");
             for (int l = index.Item2; l < nextIndex.Item2; l++)
             {
-                Frame removingFrame = NewFrame(replacingCanvas);
+                Frame removingFrame = NewFrame(App.Scene.AddCanvas(index.Item1, l));
                 Timeline[index.Item1].Frames[l] = removingFrame;
             }
+
+            Debug.Log("Running GetTrackCanvases in RemoveKeyFrame AFTER AddCanvas");
+            GetTrackCanvases();
 
             FillandCleanTimeline();
             SelectTimelineFrame(index.Item1, Math.Clamp(index.Item2, 0, GetTimelineLength() - 1));
@@ -737,8 +786,59 @@ namespace TiltBrush.FrameAnimation
             Timeline = newTimeline;
         }
 
+        public void ExtendTimeLine()
+        {
+            /*
+            Basically it should look at the existing frames and extend their length to match the timeline length
+            If this works, then we should replace FillTimeline() which is only referenced 4 times here
+            We should use the extend key frame() function
+
+            */
+
+            // CODE FROM FillTimeLine()
+            int maxTimeline = GetTimelineLength();
+            var newTimeline = new List<Track>();
+
+            for (int t = 0; t < Timeline.Count; t++)
+            {
+                Track addingTrack = NewTrack();
+                addingTrack.Deleted = Timeline[t].Deleted;
+                newTimeline.Add(addingTrack);
+                int f;
+                for (f = 0; f < Timeline[t].Frames.Count; f++)
+                {
+                    newTimeline[t].Frames.Add(Timeline[t].Frames[f]);
+                    Debug.Log("newTimeline["+t+"].Frames.Add(Timeline["+t+"].Frames["+f+"]);");
+                }
+
+                if (f < maxTimeline)
+                {
+                    while (f < maxTimeline)
+                    {
+                        Debug.Log("Should run Extend Frames on Timeline " + t + " and frame " + f);
+                        // This is where you will extend the frame
+
+                        // PREVIOUS CODE
+                        // Frame addingFrame = NewFrame(App.Scene.AddCanvas());
+                        // newTimeline[t].Frames.Add(addingFrame);
+
+                        f++; // NEED THIS FUCKING ITERATOR OR ELSE YOU'RE COOKED!
+                    }
+                }
+            }
+            // Timeline = newTimeline; // COMMENT OUT! Comment back in when this is working. This replaces the current Timeline
+            // Once done, need to do an extend timeline on AddLayerRefresh
+        }
+
         public void FillTimeline()
         {
+            /*
+            This is what adds an empty canvas when timeline is extended
+            Will need to create a new function that extends the timeline
+            Remove line below once ExtendTimeLine is updating values
+            */
+            ExtendTimeLine();
+
             int maxTimeline = GetTimelineLength();
             var newTimeline = new List<Track>();
 
@@ -757,6 +857,7 @@ namespace TiltBrush.FrameAnimation
                 {
                     while (f < maxTimeline)
                     {
+                        Debug.Log("public void FillTimeline" + " : AddCanvas function will run");
                         Frame addingFrame = NewFrame(App.Scene.AddCanvas());
                         newTimeline[t].Frames.Add(addingFrame);
                         f++;
@@ -775,6 +876,10 @@ namespace TiltBrush.FrameAnimation
 
         public (int, int) MoveKeyFrame(bool moveRight, int trackNum = -1, int frameNum = -1)
         {
+            if (trackNum == 0){
+                Debug.Log("Modifying MainCanvas that's not extending/reducing. DON'T DO THAT!");
+            }
+
             (int, int) index = (trackNum == -1 || frameNum == -1) ? GetCanvasLocation(App.Scene.ActiveCanvas) : (trackNum, frameNum);
             (int, int) nextIndex = GetFollowingFrameIndex(index.Item1, index.Item2);
             bool failure = false;
@@ -783,7 +888,8 @@ namespace TiltBrush.FrameAnimation
             {
                 if (nextIndex.Item2 >= Timeline[nextIndex.Item1].Frames.Count)
                 {
-                    Frame emptyFrame = NewFrame(App.Scene.AddCanvas());
+                    Debug.Log("public (int, int) MoveKeyFrame" + " : AddCanvas function will run");
+                    Frame emptyFrame = NewFrame(App.Scene.AddCanvas(index.Item1, index.Item2)); // is that correct?
                     Frame movedFrame = Timeline[index.Item1].Frames[index.Item2];
                     Timeline[index.Item1].Frames[index.Item2] = emptyFrame;
                     Timeline[nextIndex.Item1].Frames.Insert(Timeline[nextIndex.Item1].Frames.Count, movedFrame);
@@ -829,30 +935,43 @@ namespace TiltBrush.FrameAnimation
         // TODO Hidden by overloads
         public void AddKeyFrame(int trackNum)
         {
+            if (trackNum == 0){
+                Debug.Log("Modifying MainCanvas that's not extending/reducing. DON'T DO THAT!");
+            }
+
             (int, int) index = (trackNum, Timeline[trackNum].Frames.Count - 1);
             (int, int) nextIndex = GetFollowingFrameIndex(index.Item1, index.Item2);
 
             if (nextIndex.Item2 >= Timeline[nextIndex.Item1].Frames.Count)
             {
+                Debug.Log("public void AddKeyFrame(int), if true statement: " + " : AddCanvas function will run");
                 Frame addingFrame = NewFrame(App.Scene.AddCanvas());
                 Timeline[nextIndex.Item1].Frames.Insert(Timeline[nextIndex.Item1].Frames.Count, addingFrame);
                 nextIndex.Item2 = Timeline[nextIndex.Item1].Frames.Count - 1;
             }
             else if (GetFrameFilled(nextIndex.Item1, nextIndex.Item2))
             {
+                Debug.Log("public void AddKeyFrame(int), if false statement: " + " : AddCanvas function will run");
                 Frame addingFrame = NewFrame(App.Scene.AddCanvas());
                 Timeline[nextIndex.Item1].Frames.Insert(nextIndex.Item2, addingFrame);
             }
+
+            Debug.Log("Timeline.Count " + Timeline.Count);
         }
 
         public (int, int) AddKeyFrame(int trackNum = -1, int frameNum = -1)
         {
+            if (trackNum == 0){
+                Debug.Log("Modifying MainCanvas that's not extending/reducing. DON'T DO THAT!");
+            }
+
             (int, int) index = (trackNum == -1 || frameNum == -1) ? GetCanvasLocation(App.Scene.ActiveCanvas) : (trackNum, frameNum);
             (int, int) insertingAt;
             (int, int) nextIndex = GetFollowingFrameIndex(index.Item1, index.Item2);
 
             if (nextIndex.Item2 >= Timeline[nextIndex.Item1].Frames.Count)
             {
+                Debug.Log("public void AddKeyFrame(int,int), if true statement: " + " : AddCanvas function will run");
                 Frame addingFrame = NewFrame(App.Scene.AddCanvas());
                 Timeline[nextIndex.Item1].Frames.Insert(Timeline[nextIndex.Item1].Frames.Count, addingFrame);
                 nextIndex.Item2 = Timeline[nextIndex.Item1].Frames.Count - 1;
@@ -860,6 +979,7 @@ namespace TiltBrush.FrameAnimation
             }
             else if (GetFrameFilled(nextIndex.Item1, nextIndex.Item2))
             {
+                Debug.Log("public void AddKeyFrame(int,int), if false statement: " + " : AddCanvas function will run");
                 Frame addingFrame = NewFrame(App.Scene.AddCanvas());
                 Timeline[nextIndex.Item1].Frames.Insert(nextIndex.Item2, addingFrame);
                 insertingAt = nextIndex;
@@ -909,6 +1029,15 @@ namespace TiltBrush.FrameAnimation
                     }
                     else
                     {
+                        /* FOCUS ON THIS!!! Behavior should be to extend the frame of the affected Timeline
+                        May replicate the true statement, but must account for the last frame of that Timeline
+
+                        Extending empty frames will not work, so we need to see what's happening
+                        Removing an extended frame will revert the frames back to individual empty frames
+                        Pseudocode: */ 
+                        //
+                        //
+
                         Frame addingFrame = NewFrame(App.Scene.AddCanvas());
                         Timeline[l].Frames.Insert(Timeline[l].Frames.Count, addingFrame);
                     }
@@ -934,6 +1063,7 @@ namespace TiltBrush.FrameAnimation
             int frameLength = GetFrameLength(index.Item1, index.Item2);
             if (frameLength > 1)
             {
+                Debug.Log("public (int, int) ReduceKeyFrame" + " : AddCanvas function will run");
                 Frame emptyFrame = NewFrame(App.Scene.AddCanvas());
                 Timeline[index.Item1].Frames[index.Item2 + frameLength - 1] = emptyFrame;
 
@@ -947,9 +1077,14 @@ namespace TiltBrush.FrameAnimation
 
         public (int, int) splitKeyFrame(int trackNum = -1, int frameNum = -1)
         {
+            if (trackNum == 0){
+                Debug.Log("Modifying MainCanvas that's not extending/reducing. DON'T DO THAT!");
+            }
+
             (int, int) index = (trackNum == -1 || frameNum == -1) ? GetCanvasLocation(App.Scene.ActiveCanvas) : (trackNum, frameNum);
 
-            CanvasScript newCanvas = App.Scene.AddCanvas();
+            Debug.Log("public (int, int) splitKeyFrame" + " : AddCanvas function will run");
+            CanvasScript newCanvas = App.Scene.AddCanvas(index.Item1, index.Item2);
             CanvasScript oldCanvas = App.Scene.ActiveCanvas;
 
             int frameLegnth = GetFrameLength(index.Item1, index.Item2);
@@ -1005,8 +1140,13 @@ namespace TiltBrush.FrameAnimation
 
         public (int, int) duplicateKeyFrame(int trackNum = -1, int frameNum = -1)
         {
+            if (trackNum == 0){
+                Debug.Log("Modifying MainCanvas that's not extending/reducing. DON'T DO THAT!");
+            }
+
             (int, int) index = (trackNum == -1 || frameNum == -1) ? GetCanvasLocation(App.Scene.ActiveCanvas) : (trackNum, frameNum);
-            CanvasScript newCanvas = App.Scene.AddCanvas();
+            Debug.Log("public (int, int) duplicateKeyFrame" + " : AddCanvas function will run");
+            CanvasScript newCanvas = App.Scene.AddCanvas(index.Item1, index.Item2 + 1);
             CanvasScript oldCanvas = App.Scene.ActiveCanvas;
 
             int frameLegnth = GetFrameLength(index.Item1, index.Item2);
