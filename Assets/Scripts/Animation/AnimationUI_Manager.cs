@@ -247,48 +247,24 @@ namespace TiltBrush.FrameAnimation
             ResetTimeline();
         }
 
-        public void AddLayerRefresh(CanvasScript canvasAdding)
+        public CanvasScript AddLayerRefresh(CanvasScript canvasAdding)
         {
-            Debug.Log("We need to update AddLayerRefresh as this is also adding empty frames when creating new layer");
-            /* 
-            
-            Track addingTrack = NewTrack();
-            addingFrame = NewFrame(canvasAdding); // Canvas already created from AddLayerNow() in SceneScripts.cs
-
-            for (int i = 0; i < GetTimelineLength(); i++)
-            {
-                // extend the addingFrame here
-            }
-            addingTrack.Frames.Add(addingFrame); // set the track to the extended layer from the loop
-            
-            Timeline.Add(addingTrack);
-            ResetTimeline();
-            */
-            // canvasAdding.gameObject.SetActive(true); // Tried using this if it can set this up as a "live" frame. No.
             CanvasScript canvasFill;
             Track addingTrack = NewTrack();
             Frame addingFrame;
             for (int i = 0; i < GetTimelineLength(); i++)
             {
-                canvasFill = App.Scene.AddCanvas(Timeline.Count, i);    
-                addingFrame = NewFrame(i == FrameOn ? canvasAdding : canvasFill);
-                if (i == FrameOn) {App.Scene.ActiveCanvas = addingFrame.Canvas;} 
+                canvasFill = App.Scene.AddCanvas();    
+                addingFrame = NewFrame(i == 0 ? canvasAdding : canvasFill);
+                    if (i == FrameOn)
+                    {
+                        canvasAdding = addingFrame.Canvas;
+                    } 
                 addingTrack.Frames.Add(addingFrame);
             }            
             Timeline.Add(addingTrack);
             ResetTimeline();
-            /*
-            Track addingTrack = NewTrack();
-
-            for (int i = 0; i < GetTimelineLength(); i++)
-            {
-                Frame addingFrame;
-                addingFrame = NewFrame(i == FrameOn ? canvasAdding : App.Scene.AddCanvas());
-                addingTrack.Frames.Add(addingFrame);
-            }
-            Timeline.Add(addingTrack);
-            ResetTimeline();
-            */
+            return canvasAdding;
         }
 
         public (int, int) GetCanvasLocation(CanvasScript canvas)
@@ -711,14 +687,9 @@ namespace TiltBrush.FrameAnimation
             deletedFrame.Location = (index.Item1, index.Item2);
 
 
-            Debug.Log("Running GetTrackCanvases in RemoveKeyFrame before AddCanvas");
-            GetTrackCanvases();
-            
             App.Scene.ClearLayerContents(deletedFrame.Frame.Canvas); // without this, it will error out in SketchWriter.cs:EnumerateAdjustedSnapshots()
-            App.Scene.HideCanvas(deletedFrame.Frame.Canvas); //App.Scene.HideCanvas(Timeline[index.Item1].Frames[index.Item2].Canvas);
-
-            // CanvasScript replacingCanvas = App.Scene.AddCanvas(); // move inside of loop
-            Debug.Log("public DeletedFrame RemoveKeyFrame" + " : AddCanvas function will run in loop");
+            App.Scene.HideCanvas(deletedFrame.Frame.Canvas);
+            CanvasScript replacingCanvas = App.Scene.AddCanvas();
             for (int l = index.Item2; l < nextIndex.Item2; l++)
             {
                 Frame removingFrame = NewFrame(App.Scene.AddCanvas(index.Item1, l));
