@@ -249,17 +249,31 @@ namespace TiltBrush.FrameAnimation
 
         public CanvasScript AddLayerRefresh(CanvasScript canvasAdding)
         {
+            // deposits an empty object to the canvas so it's "filled"
+            // will need to investigate if the test object persists every load
+            // if so, need to garbage collect it
+            GameObject test = new GameObject("test"); 
+            
             CanvasScript canvasFill;
             Track addingTrack = NewTrack();
             Frame addingFrame;
             for (int i = 0; i < GetTimelineLength(); i++)
             {
                 canvasFill = App.Scene.AddCanvas();    
-                addingFrame = NewFrame(i == 0 ? canvasAdding : canvasFill);
-                    if (i == FrameOn)
-                    {
-                        canvasAdding = addingFrame.Canvas;
-                    } 
+
+                if (i == 0)
+                {
+                    addingFrame = NewFrame(canvasAdding);
+                    test.transform.SetParent(canvasAdding.transform);
+                } else {
+                    addingFrame = NewFrame(canvasFill);
+                }
+
+                if (i == FrameOn)
+                {
+                    canvasAdding = addingFrame.Canvas;
+                } 
+                
                 addingTrack.Frames.Add(addingFrame);
             }            
             Timeline.Add(addingTrack);
@@ -359,6 +373,7 @@ namespace TiltBrush.FrameAnimation
 
         public void ResetTimeline()
         {
+            Debug.Log("ResetTimeline about to destroy stuff!");
             if (timelineNotches != null)
             {
                 foreach (var notch in timelineNotches)
@@ -977,38 +992,52 @@ namespace TiltBrush.FrameAnimation
 
         public (int, int) ExtendKeyFrame(int trackNum = -1, int frameNum = -1)
         {
-            (int, int) index = (trackNum == -1 || frameNum == -1) ? GetCanvasLocation(App.Scene.ActiveCanvas) : (trackNum, frameNum);
-            if (!GetFrameFilled(index.Item1, index.Item2))
+            /* 
+            FOCUS ON THIS!!! Behavior should be to extend the frame of the affected Timeline
+            May replicate the true statement, but must account for the last frame of that Timeline
+
+            Extending empty frames will not work, so we need to see what's happening
+            Removing an extended frame will revert the frames back to individual empty frames
+            
+            Funkiness happens when extending empty frames. Reduce Key Frame needs to be updated as well
+            Pseudocode VVV */ 
+            //
+            //
+            
+            if (trackNum == -1 || frameNum == -1)
+            {
+                trackNum = GetCanvasLocation(App.Scene.ActiveCanvas).Item1;
+                frameNum = GetCanvasLocation(App.Scene.ActiveCanvas).Item2;
+            }
+
+            /*
+            Below checks if the frame being extended is empty
+            Extending empty frames works. The visual of it is correct in the panel.
+            Funkiness happens, however, as doing this may cause out of index errors
+            */
+            if (!GetFrameFilled(trackNum, frameNum))
             {
                 return (-1, -1);
             }
 
-            int frameLength = GetFrameLength(index.Item1, index.Item2);
+            int frameLength = GetFrameLength(trackNum, frameNum);
 
-            if (index.Item2 + frameLength >= Timeline[index.Item1].Frames.Count ||
-                GetFrameFilled(index.Item1, index.Item2 + frameLength))
+            if (frameNum + frameLength >= Timeline[trackNum].Frames.Count ||
+                GetFrameFilled(trackNum, frameNum + frameLength))
             {
+                // run when extending one of many frames, OR extending an already extended frame
                 for (int l = 0; l < Timeline.Count; l++)
                 {
-                    if (l == index.Item1)
+                    if (l == trackNum)
                     {
-                        Frame addingFrame = NewFrame(Timeline[l].Frames[index.Item2].Canvas);
-                        addingFrame.Deleted = Timeline[l].Frames[index.Item2].Deleted;
-                        addingFrame.AnimatedPath = Timeline[l].Frames[index.Item2].AnimatedPath;
+                        Frame addingFrame = NewFrame(Timeline[l].Frames[frameNum].Canvas);
+                        addingFrame.Deleted = Timeline[l].Frames[frameNum].Deleted;
+                        addingFrame.AnimatedPath = Timeline[l].Frames[frameNum].AnimatedPath;
 
-                        Timeline[l].Frames.Insert(index.Item2 + 1, addingFrame);
+                        Timeline[l].Frames.Insert(frameNum + 1, addingFrame);
                     }
                     else
                     {
-                        /* FOCUS ON THIS!!! Behavior should be to extend the frame of the affected Timeline
-                        May replicate the true statement, but must account for the last frame of that Timeline
-
-                        Extending empty frames will not work, so we need to see what's happening
-                        Removing an extended frame will revert the frames back to individual empty frames
-                        Pseudocode: */ 
-                        //
-                        //
-
                         Frame addingFrame = NewFrame(App.Scene.AddCanvas());
                         Timeline[l].Frames.Insert(Timeline[l].Frames.Count, addingFrame);
                     }
@@ -1016,16 +1045,16 @@ namespace TiltBrush.FrameAnimation
             }
             else
             {
-                Frame addingFrame = NewFrame(Timeline[index.Item1].Frames[index.Item2].Canvas);
-                addingFrame.Deleted = Timeline[index.Item1].Frames[index.Item2].Deleted;
-                addingFrame.AnimatedPath = Timeline[index.Item1].Frames[index.Item2].AnimatedPath;
-                Timeline[index.Item1].Frames[index.Item2 + frameLength] = addingFrame;
+                Frame addingFrame = NewFrame(Timeline[trackNum].Frames[frameNum].Canvas);
+                addingFrame.Deleted = Timeline[trackNum].Frames[frameNum].Deleted;
+                addingFrame.AnimatedPath = Timeline[trackNum].Frames[frameNum].AnimatedPath;
+                Timeline[trackNum].Frames[frameNum + frameLength] = addingFrame;
             }
 
             m_FrameOn++;
             FocusFrame((int)m_FrameOn);
             ResetTimeline();
-            return index;
+            return (trackNum, frameNum);
         }
 
         public (int, int) ReduceKeyFrame(int trackNum = -1, int frameNum = -1)
