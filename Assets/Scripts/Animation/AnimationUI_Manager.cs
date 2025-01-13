@@ -51,6 +51,8 @@ namespace TiltBrush.FrameAnimation
         public List<GameObject> timelineNotches;
         public List<GameObject> timelineFrameObjects;
 
+        public List<GameObject> trackNodesWidget;
+
         int FrameOn => Math.Clamp((int)m_FrameOn, 0, GetTimelineLength() - 1);
 
         public struct Frame
@@ -371,9 +373,76 @@ namespace TiltBrush.FrameAnimation
             return maxLength;
         }
 
+        /*
+        TODO
+        BEFORE ANYTHING ELSE, WE NEED TO OVERHAUL ResetTimeline and the AnimUI Panel
+        It's being destroyed and constructed at run-time, so it is VERY INEFFICIENT
+        Will need to emulate how the LayerPanel is done, which is page by page and preset notches
+        */
+
+        public void TESTResetTimeline()
+        {
+            // EMULATING LayerUI_Manager.cs:ResetUI() line 48
+            // If you delete a whole layer, it DOES NOT REMOVE that track. Will utilize Deleted on struct.
+
+            int trackCount = 0;
+            List<Track> ActiveTrack = new();
+
+            foreach (Track track in Timeline)
+            { 
+                if (!track.Deleted){
+                    //Debug.Log("track.GetHashCode() " + track.GetHashCode());
+                    ActiveTrack.Add(track);
+                    trackCount += 1;
+                }
+            }
+
+            Debug.Log("Active Track Count: " + trackCount);
+ 
+            int loopLimitTrack = Math.Min(trackNodesWidget.Count,ActiveTrack.Count);
+            Debug.Log("loopLimitTrack " + loopLimitTrack);
+
+            for (int i = 0; i < loopLimitTrack; i++)
+            {
+                Debug.Log("ActiveTrack[i].Frames.Count " + ActiveTrack[i].Frames.Count);
+                if (ActiveTrack[i].Frames.Count > 0) // check if there is a frame here.
+                {
+                    trackNodesWidget[i].SetActive(true);
+
+                    int loopLimitFrames = Math.Min(trackNodesWidget[i].gameObject.transform.childCount,ActiveTrack[i].Frames.Count);
+                    for (int j = 0; j < loopLimitFrames ; j++)
+                    {
+                        var frameButton = trackNodesWidget[i].transform.GetChild(j);
+                        frameButton.gameObject.SetActive(true);
+                        
+                        Debug.Log("frameButton.childCount " + frameButton.childCount);
+
+                        Debug.Log("ActiveTrack[i].Frames[j].GetHashCode() " + ActiveTrack[i].Frames[j].GetHashCode());
+                    }
+                } else {
+                    trackNodesWidget[i].SetActive(false);                   
+                }
+
+                //// OUT OF INDEX ERROR
+                // if (ActiveTrack[i + 1].Frames.Count > 0) // check if there is a frame here. 
+                // {
+                //     int frameCount = ActiveTrack[i + 1].Frames.Count;
+                //     trackNodesWidget[i].SetActive(true);
+
+                //     for (int j = 0; j < frameCount; j++)
+                //     {
+                //         var frameButton = trackNodesWidget[i].transform.GetChild(j);
+                //         frameButton.gameObject.SetActive(true);
+
+                //         Debug.Log("ActiveTrack[i].Frames[j].GetHashCode() " + ActiveTrack[i].Frames[j].GetHashCode());
+                //     }
+
+                // }
+            }
+        }
+
         public void ResetTimeline()
         {
-            Debug.Log("ResetTimeline about to destroy stuff!");
             if (timelineNotches != null)
             {
                 foreach (var notch in timelineNotches)
@@ -505,6 +574,8 @@ namespace TiltBrush.FrameAnimation
             UpdateTrackScroll();
             UpdateUI();
             App.Scene.TriggerLayersUpdate();
+
+            TESTResetTimeline();
         }
 
         public void UpdateTrackScroll(int scrollOffset, float scrollHeight)
@@ -1075,91 +1146,39 @@ namespace TiltBrush.FrameAnimation
             return index;
         }
 
-        public (int, int) splitKeyFrame(int trackNum = -1, int frameNum = -1)
+        private void OldStrokesToNewCanvas(List<Stroke> oldStrokes, CanvasScript newCanvas)
         {
-            if (trackNum == 0){
-                Debug.Log("Modifying MainCanvas that's not extending/reducing. DON'T DO THAT!");
-            }
 
-            (int, int) index = (trackNum == -1 || frameNum == -1) ? GetCanvasLocation(App.Scene.ActiveCanvas) : (trackNum, frameNum);
-
-            Debug.Log("public (int, int) splitKeyFrame" + " : AddCanvas function will run");
-            CanvasScript newCanvas = App.Scene.AddCanvas(index.Item1, index.Item2);
-            CanvasScript oldCanvas = App.Scene.ActiveCanvas;
-
-            int frameLegnth = GetFrameLength(index.Item1, index.Item2);
-
-
-            int splittingIndex = FrameOn;
-            if (splittingIndex < index.Item2 || splittingIndex > index.Item2 + frameLegnth - 1) return (-1, -1);
-
-            List<Stroke> oldStrokes = SketchMemoryScript.m_Instance.GetMemoryList
-                .Where(x => x.Canvas == oldCanvas).ToList();
-
-            List<Stroke> newStrokes = oldStrokes.Select(stroke =>
-                SketchMemoryScript.m_Instance.DuplicateStroke(stroke, App.Scene.SelectionCanvas, null))
-                .ToList();
-
-            foreach (var stroke in newStrokes)
-            {
-                switch (stroke.m_Type)
-                {
-                    case Stroke.Type.BrushStroke:
-                        {
-                            BaseBrushScript brushScript = stroke.m_Object.GetComponent<BaseBrushScript>();
-                            if (brushScript)
-                            {
-                                brushScript.HideBrush(false);
-                            }
-                        }
-                        break;
-                    case Stroke.Type.BatchedBrushStroke:
-                        {
-                            stroke.m_BatchSubset.m_ParentBatch.EnableSubset(stroke.m_BatchSubset);
-                        }
-                        break;
-                    default:
-                        Debug.LogError("Unexpected: redo NotCreated duplicate stroke");
-                        break;
-                }
-                TiltMeterScript.m_Instance.AdjustMeter(stroke, up: true);
-
-                stroke.SetParentKeepWorldPosition(newCanvas);
-            }
-
-            for (int f = splittingIndex; f < index.Item2 + frameLegnth; f++)
-            {
-                Frame addingFrame = NewFrame(newCanvas);
-                Timeline[index.Item1].Frames[f] = addingFrame;
-            }
-
-            SelectTimelineFrame(index.Item1, splittingIndex);
-            ResetTimeline();
-            return (index.Item1, splittingIndex);
-        }
-
-        public (int, int) duplicateKeyFrame(int trackNum = -1, int frameNum = -1)
-        {
-            if (trackNum == 0){
-                Debug.Log("Modifying MainCanvas that's not extending/reducing. DON'T DO THAT!");
-            }
-
-            (int, int) index = (trackNum == -1 || frameNum == -1) ? GetCanvasLocation(App.Scene.ActiveCanvas) : (trackNum, frameNum);
-            Debug.Log("public (int, int) duplicateKeyFrame" + " : AddCanvas function will run");
-            CanvasScript newCanvas = App.Scene.AddCanvas(index.Item1, index.Item2 + 1);
-            CanvasScript oldCanvas = App.Scene.ActiveCanvas;
-
-            int frameLegnth = GetFrameLength(index.Item1, index.Item2);
-            (int, int) nextIndex = GetFollowingFrameIndex(index.Item1, index.Item2);
-            List<Stroke> oldStrokes = SketchMemoryScript.m_Instance.GetMemoryList
-                .Where(x => x.Canvas == oldCanvas).ToList();
-
+            Dictionary<int, List<Stroke>> strokeGroups = new Dictionary<int, List<Stroke>>();
             List<Stroke> newStrokes = oldStrokes
                 .Select(stroke => SketchMemoryScript.m_Instance.DuplicateStroke(
                     stroke, App.Scene.SelectionCanvas, null)).ToList();
 
+            for (int i = 0; i < oldStrokes.Count ; i++)
+            {
+                if (oldStrokes.Count == newStrokes.Count && oldStrokes[i].m_Type == Stroke.Type.NotCreated)
+                {
+                    // using time memory of oldStrokes to mark Uncreated strokes towards newStrokes
+                    newStrokes[i].Uncreate();
+                }
+            }
+
             foreach (var stroke in newStrokes)
             {
+                if (stroke.Group != SketchGroupTag.None)
+                    {
+                        if (strokeGroups.TryGetValue(stroke.Group.GetHashCode(), out List<Stroke> group))
+                        {
+                            group.Add(stroke);
+                            Debug.Log("strokeGroups : " + stroke.Group.GetHashCode() + " group already exists");
+                        }
+                        else
+                        {
+                            strokeGroups[stroke.Group.GetHashCode()] = new List<Stroke> { stroke };
+                            Debug.Log("strokeGroups : Creating group # " + stroke.Group.GetHashCode());
+                        }   
+                    }
+
                 switch (stroke.m_Type)
                 {
                     case Stroke.Type.BrushStroke:
@@ -1172,15 +1191,74 @@ namespace TiltBrush.FrameAnimation
                     case Stroke.Type.BatchedBrushStroke:
                         stroke.m_BatchSubset.m_ParentBatch.EnableSubset(stroke.m_BatchSubset);
                         break;
-                    default:
-                        Debug.LogError("Unexpected: redo NotCreated duplicate stroke");
-                        break;
                 }
-                TiltMeterScript.m_Instance.AdjustMeter(stroke, up: true);
-                stroke.SetParentKeepWorldPosition(newCanvas);
+
+                if (stroke.m_Type != Stroke.Type.NotCreated){
+                    TiltMeterScript.m_Instance.AdjustMeter(stroke, up: true);
+                    stroke.SetParentKeepWorldPosition(newCanvas);                   
+                }
             }
 
-            for (int f = 0; f < frameLegnth; f++)
+            foreach (var sg in strokeGroups)
+            {
+                GroupManager.MoveStrokesToNewGroups(sg.Value,null);
+                Debug.Log("strokeGroups : sg.Key" + sg.Key);
+            }
+        }
+
+        public (int, int) SplitKeyFrame(int trackNum = -1, int frameNum = -1)
+        {
+            if (trackNum == 0){
+                Debug.Log("Modifying MainCanvas that's not extending/reducing. DON'T DO THAT!");
+            }
+
+            (int, int) index = (trackNum == -1 || frameNum == -1) ? GetCanvasLocation(App.Scene.ActiveCanvas) : (trackNum, frameNum);
+
+            Debug.Log("public (int, int) splitKeyFrame" + " : AddCanvas function will run");
+            CanvasScript newCanvas = App.Scene.AddCanvas(index.Item1, index.Item2);
+            CanvasScript oldCanvas = App.Scene.ActiveCanvas;
+
+            int frameLength = GetFrameLength(index.Item1, index.Item2);
+
+            int splittingIndex = FrameOn;
+            if (splittingIndex < index.Item2 || splittingIndex > index.Item2 + frameLength - 1) return (-1, -1);
+
+            List<Stroke> oldStrokes = SketchMemoryScript.m_Instance.GetMemoryList
+                .Where(x => x.Canvas == oldCanvas).ToList();
+
+            OldStrokesToNewCanvas(oldStrokes,newCanvas);
+
+            for (int f = splittingIndex; f < index.Item2 + frameLength; f++)
+            {
+                Frame addingFrame = NewFrame(newCanvas);
+                Timeline[index.Item1].Frames[f] = addingFrame;
+            }
+
+            SelectTimelineFrame(index.Item1, splittingIndex);
+            ResetTimeline();
+            return (index.Item1, splittingIndex);
+        }
+
+        public (int, int) DuplicateKeyFrame(int trackNum = -1, int frameNum = -1)
+        {
+            if (trackNum == 0){
+                Debug.Log("Modifying MainCanvas that's not extending/reducing. DON'T DO THAT!");
+            }
+
+            (int, int) index = (trackNum == -1 || frameNum == -1) ? GetCanvasLocation(App.Scene.ActiveCanvas) : (trackNum, frameNum);
+            Debug.Log("public (int, int) duplicateKeyFrame" + " : AddCanvas function will run");
+            CanvasScript newCanvas = App.Scene.AddCanvas(index.Item1, index.Item2 + 1);
+            CanvasScript oldCanvas = App.Scene.ActiveCanvas;
+
+            int frameLength = GetFrameLength(index.Item1, index.Item2);
+            (int, int) nextIndex = GetFollowingFrameIndex(index.Item1, index.Item2);
+
+            List<Stroke> oldStrokes = SketchMemoryScript.m_Instance.GetMemoryList
+                .Where(x => x.Canvas == oldCanvas).ToList();
+
+            OldStrokesToNewCanvas(oldStrokes, newCanvas);
+
+            for (int f = 0; f < frameLength; f++)
             {
                 if (nextIndex.Item2 + f < Timeline[nextIndex.Item1].Frames.Count &&
                     !GetFrameFilled(nextIndex.Item1, nextIndex.Item2))
