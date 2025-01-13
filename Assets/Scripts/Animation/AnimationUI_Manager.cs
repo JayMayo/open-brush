@@ -1147,8 +1147,9 @@ namespace TiltBrush.FrameAnimation
         }
 
         // TO DO. From here to end of duplicate frame, move it to the animation/branch, then commit for review
-        private void ReplicateStrokesToNewCanvas(List<Stroke> oldStrokes, CanvasScript newCanvas)
+        private CanvasScript ReplicateStrokesToNewCanvas(List<Stroke> oldStrokes)
         {
+            CanvasScript newCanvas = App.Scene.AddCanvas();
             List<Stroke> newStrokes = oldStrokes
                 .Select(stroke => SketchMemoryScript.m_Instance.DuplicateStroke(
                     stroke, App.Scene.SelectionCanvas, null)).ToList();
@@ -1205,6 +1206,8 @@ namespace TiltBrush.FrameAnimation
             {
                 GroupManager.MoveStrokesToNewGroups(sg.Value,null);
             }
+
+            return newCanvas;
         }
 
         public (int, int) SplitKeyFrame(int trackNum = -1, int frameNum = -1)
@@ -1216,18 +1219,17 @@ namespace TiltBrush.FrameAnimation
             (int, int) index = (trackNum == -1 || frameNum == -1) ? GetCanvasLocation(App.Scene.ActiveCanvas) : (trackNum, frameNum);
 
             Debug.Log("public (int, int) splitKeyFrame" + " : AddCanvas function will run");
-            CanvasScript newCanvas = App.Scene.AddCanvas(index.Item1, index.Item2);
             CanvasScript oldCanvas = App.Scene.ActiveCanvas;
+
+            List<Stroke> oldStrokes = SketchMemoryScript.m_Instance.GetMemoryList
+                .Where(x => x.Canvas == oldCanvas).ToList();
+
+            CanvasScript newCanvas = ReplicateStrokesToNewCanvas(oldStrokes);
 
             int frameLength = GetFrameLength(index.Item1, index.Item2);
 
             int splittingIndex = FrameOn;
             if (splittingIndex < index.Item2 || splittingIndex > index.Item2 + frameLength - 1) return (-1, -1);
-
-            List<Stroke> oldStrokes = SketchMemoryScript.m_Instance.GetMemoryList
-                .Where(x => x.Canvas == oldCanvas).ToList();
-
-            ReplicateStrokesToNewCanvas(oldStrokes,newCanvas);
 
             for (int f = splittingIndex; f < index.Item2 + frameLength; f++)
             {
@@ -1248,16 +1250,15 @@ namespace TiltBrush.FrameAnimation
 
             (int, int) index = (trackNum == -1 || frameNum == -1) ? GetCanvasLocation(App.Scene.ActiveCanvas) : (trackNum, frameNum);
             Debug.Log("public (int, int) duplicateKeyFrame" + " : AddCanvas function will run");
-            CanvasScript newCanvas = App.Scene.AddCanvas(index.Item1, index.Item2 + 1);
             CanvasScript oldCanvas = App.Scene.ActiveCanvas;
-
-            int frameLength = GetFrameLength(index.Item1, index.Item2);
-            (int, int) nextIndex = GetFollowingFrameIndex(index.Item1, index.Item2);
 
             List<Stroke> oldStrokes = SketchMemoryScript.m_Instance.GetMemoryList
                 .Where(x => x.Canvas == oldCanvas).ToList();
 
-            ReplicateStrokesToNewCanvas(oldStrokes, newCanvas);
+            CanvasScript newCanvas = ReplicateStrokesToNewCanvas(oldStrokes);
+
+            int frameLength = GetFrameLength(index.Item1, index.Item2);
+            (int, int) nextIndex = GetFollowingFrameIndex(index.Item1, index.Item2);
 
             for (int f = 0; f < frameLength; f++)
             {
