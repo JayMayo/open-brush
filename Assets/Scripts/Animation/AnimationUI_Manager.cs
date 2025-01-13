@@ -1146,10 +1146,9 @@ namespace TiltBrush.FrameAnimation
             return index;
         }
 
-        private void OldStrokesToNewCanvas(List<Stroke> oldStrokes, CanvasScript newCanvas)
+        // TO DO. From here to end of duplicate frame, move it to the animation/branch, then commit for review
+        private void ReplicateStrokesToNewCanvas(List<Stroke> oldStrokes, CanvasScript newCanvas)
         {
-
-            Dictionary<int, List<Stroke>> strokeGroups = new Dictionary<int, List<Stroke>>();
             List<Stroke> newStrokes = oldStrokes
                 .Select(stroke => SketchMemoryScript.m_Instance.DuplicateStroke(
                     stroke, App.Scene.SelectionCanvas, null)).ToList();
@@ -1158,11 +1157,15 @@ namespace TiltBrush.FrameAnimation
             {
                 if (oldStrokes.Count == newStrokes.Count && oldStrokes[i].m_Type == Stroke.Type.NotCreated)
                 {
-                    // using time memory of oldStrokes to mark Uncreated strokes towards newStrokes
+                    // using SketchMemory of oldStrokes to mark Uncreated strokes on newStrokes. Otherwise, Uncreated strokes will be re-made.
                     newStrokes[i].Uncreate();
+                } else {
+                    Debug.LogWarning("Unexpected. Count of oldStrokes must match newStrokes.");
                 }
             }
 
+            Dictionary<int, List<Stroke>> strokeGroups = new Dictionary<int, List<Stroke>>();
+            
             foreach (var stroke in newStrokes)
             {
                 if (stroke.Group != SketchGroupTag.None)
@@ -1170,12 +1173,10 @@ namespace TiltBrush.FrameAnimation
                         if (strokeGroups.TryGetValue(stroke.Group.GetHashCode(), out List<Stroke> group))
                         {
                             group.Add(stroke);
-                            Debug.Log("strokeGroups : " + stroke.Group.GetHashCode() + " group already exists");
                         }
                         else
                         {
                             strokeGroups[stroke.Group.GetHashCode()] = new List<Stroke> { stroke };
-                            Debug.Log("strokeGroups : Creating group # " + stroke.Group.GetHashCode());
                         }   
                     }
 
@@ -1193,7 +1194,8 @@ namespace TiltBrush.FrameAnimation
                         break;
                 }
 
-                if (stroke.m_Type != Stroke.Type.NotCreated){
+                if (stroke.m_Type != Stroke.Type.NotCreated)
+                {
                     TiltMeterScript.m_Instance.AdjustMeter(stroke, up: true);
                     stroke.SetParentKeepWorldPosition(newCanvas);                   
                 }
@@ -1202,7 +1204,6 @@ namespace TiltBrush.FrameAnimation
             foreach (var sg in strokeGroups)
             {
                 GroupManager.MoveStrokesToNewGroups(sg.Value,null);
-                Debug.Log("strokeGroups : sg.Key" + sg.Key);
             }
         }
 
@@ -1226,7 +1227,7 @@ namespace TiltBrush.FrameAnimation
             List<Stroke> oldStrokes = SketchMemoryScript.m_Instance.GetMemoryList
                 .Where(x => x.Canvas == oldCanvas).ToList();
 
-            OldStrokesToNewCanvas(oldStrokes,newCanvas);
+            ReplicateStrokesToNewCanvas(oldStrokes,newCanvas);
 
             for (int f = splittingIndex; f < index.Item2 + frameLength; f++)
             {
@@ -1256,7 +1257,7 @@ namespace TiltBrush.FrameAnimation
             List<Stroke> oldStrokes = SketchMemoryScript.m_Instance.GetMemoryList
                 .Where(x => x.Canvas == oldCanvas).ToList();
 
-            OldStrokesToNewCanvas(oldStrokes, newCanvas);
+            ReplicateStrokesToNewCanvas(oldStrokes, newCanvas);
 
             for (int f = 0; f < frameLength; f++)
             {
