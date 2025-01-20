@@ -30,6 +30,7 @@ namespace TiltBrush.FrameAnimation
         long m_Time;
         float m_FrameOffset = 1.22f;
         int m_TrackScrollOffset;
+        int m_previousTrackScrollOffset = 0;
         bool m_Playing;
         bool m_Scrolling;
         int m_PreviousShowingFrame = -1;
@@ -50,8 +51,8 @@ namespace TiltBrush.FrameAnimation
         public GameObject frameButtonPrefab;
         public List<GameObject> timelineNotches;
         public List<GameObject> timelineFrameObjects;
-
         public List<GameObject> trackNodesWidget;
+        public GameObject frameNotchesWidget;
 
         int FrameOn => Math.Clamp((int)m_FrameOn, 0, GetTimelineLength() - 1);
 
@@ -373,180 +374,266 @@ namespace TiltBrush.FrameAnimation
             return maxLength;
         }
 
-        /*
-        TODO
-        BEFORE ANYTHING ELSE, WE NEED TO OVERHAUL ResetTimeline and the AnimUI Panel
-        It's being destroyed and constructed at run-time, so it is VERY INEFFICIENT
-        Will need to emulate how the LayerPanel is done, which is page by page and preset notches
-        */
-
-        public void TESTResetTimeline()
+        public void ResetTimeline()
         {
-            // EMULATING LayerUI_Manager.cs:ResetUI() line 48
-            // If you delete a whole layer, it DOES NOT REMOVE that track. Will utilize Deleted on struct.
+        /*
+            // // OLD CODE BELOW
+            // if (timelineNotches != null)
+            // {
+            //     foreach (var notch in timelineNotches)
+            //     {
+            //         Destroy(notch);
+            //     }
+            // }
+            // if (timelineFrameObjects != null)
+            // {
+            //     foreach (var frame in timelineFrameObjects)
+            //     {
+            //         Destroy(frame);
+            //     }
+            // }
+            // foreach (Transform thisObj in timelineField.transform)
+            // {
+            //     Destroy(thisObj.gameObject);
+            // }
 
-            int trackCount = 0;
+            // timelineNotches = new List<GameObject>();
+            // timelineFrameObjects = new List<GameObject>();
+
+            // int timelineLength = GetTimelineLength();
+            // for (int f = 0; f < timelineLength; f++)
+            // {
+            //     GameObject newNotch = Instantiate(timelineNotchPrefab);
+            //     newNotch.transform.FindChild("Num").GetComponent<TextMeshPro>().text = "" + f;
+            //     newNotch.transform.SetParent(timelineRef.transform);
+            //     newNotch.SetActive(false);
+            //     timelineNotches.Add(newNotch);
+            //     GameObject newFrame = Instantiate(timelineFramePrefab, timelineField.transform, false);
+            //     timelineFrameObjects.Add(newFrame);
+            //     newFrame.name = "FrameContainer_" + f.ToString();
+
+            //     GameObject frameWrapper = newFrame.transform.GetChild(0).gameObject;
+
+            //     int numDeleted = 0;
+
+            //     for (int i = frameWrapper.transform.childCount - 1; i >= 0; i--)
+            //     {
+            //         Destroy(frameWrapper.transform.GetChild(i).gameObject);
+            //     }
+
+            //     for (int i = 0; i < Timeline.Count; i++)
+            //     {
+            //         numDeleted += Timeline[i].Deleted ? 1 : 0;
+            //         int trackOn = i - numDeleted;
+            //         if (trackOn < Timeline.Count && !Timeline[i].Deleted)
+            //         {
+            //             var newButton = Instantiate(frameButtonPrefab, frameWrapper.transform, false);
+            //             var frameButton = newButton.transform.GetChild(0);
+
+            //             frameButton.GetComponent<MeshRenderer>().enabled = false;
+            //             frameButton.localPosition = new Vector3(0.00538007962f, 0.449999988f - m_FrameOffset * trackOn, 0);
+            //             frameButton.gameObject.SetActive(true);
+
+            //             frameButton.gameObject.GetComponent<FrameButton>().SetButtonCoordinate(i, f);
+
+            //             // Hide all ui indicators first
+            //             for (int o = 0; o < frameButton.GetChildCount(); o++)
+            //             {
+            //                 frameButton.GetChild(o).gameObject.SetActive(false);
+
+            //                 if (Timeline[i].Frames[f].AnimatedPath != null && frameButton.GetChild(o).gameObject.GetComponent<SpriteRenderer>() != null)
+            //                 {
+            //                     frameButton.GetChild(o).gameObject.GetComponent<SpriteRenderer>().color = new Color(92f / 255f, 52f / 255f, 237f / 255f);
+            //                     Timeline[i].Frames[f].AnimatedPath.gameObject.SetActive(Timeline[i].Frames[f].Canvas.Equals(App.Scene.ActiveCanvas));
+            //                 }
+            //             }
+
+            //             bool filled = GetFrameFilled(i, f); // using boolean as an ON and OFF switch. So frameState index 0 and 1.
+            //             bool backwardsConnect;
+            //             bool forwardConnect;
+
+            //             backwardsConnect = (f > 0 && Timeline[i].Frames[f].Canvas.Equals(Timeline[i].Frames[f - 1].Canvas));
+            //             forwardConnect = (f < Timeline[i].Frames.Count - 1 && Timeline[i].Frames[f].Canvas.Equals(Timeline[i].Frames[f + 1].Canvas));
+            //             frameButton.GetChild(Convert.ToInt32(filled)).gameObject.SetActive(true);
+
+            //             int backBox = 6; // frameState index 6
+            //             frameButton.GetChild(backBox).gameObject.SetActive(true);
+
+            //             // Set behind colours depending whether frame is active
+            //             Color backColor;
+            //             if (filled)
+            //             {
+            //                 if (Timeline[i].Frames[f].Canvas.Equals(App.Scene.ActiveCanvas))
+            //                 {
+            //                     backColor = new Color(150 / 255f, 150 / 255f, 150 / 255f); // neutralgray
+            //                 }
+            //                 else
+            //                 {
+            //                     backColor = new Color(0 / 255f, 0 / 255f, 0 / 255f); // black
+            //                 }
+            //             }
+            //             else
+            //             {
+            //                 (int, int) index = GetCanvasLocation(App.Scene.ActiveCanvas);
+            //                 if (index.Item1 == i && f == FrameOn)
+            //                 {
+            //                     backColor = new Color(150 / 255f, 150 / 255f, 150 / 255f); // neutralgray
+            //                 }
+            //                 else
+            //                 {
+            //                     backColor = new Color(0 / 255f, 0 / 255f, 0 / 255f); // black
+            //                 }
+            //             }
+
+            //             frameButton.GetChild(backBox).gameObject.GetComponent<SpriteRenderer>().color = backColor;
+            //             frameButton.GetChild(backBox + 1).gameObject.GetComponent<SpriteRenderer>().color = backColor;
+            //             frameButton.GetChild(backBox + 2).gameObject.GetComponent<SpriteRenderer>().color = backColor;
+
+            //             if (backwardsConnect)
+            //             {
+            //                 // frameState index 2 or 3; respectively empty connect left, filled connect left
+            //                 frameButton.GetChild(Convert.ToInt32(filled) + 2).gameObject.SetActive(true);
+                            
+            //                 // frameState index 7: back box left
+            //                 frameButton.GetChild(backBox + 1).gameObject.SetActive(true);
+            //             }
+
+            //             if (forwardConnect)
+            //             {
+            //                 // frameState index 4 or 5; respectively empty connect right, filled connect right 
+            //                 frameButton.GetChild(Convert.ToInt32(filled) + 4).gameObject.SetActive(true);
+            //                 // frameState index 8: back box right
+            //                 frameButton.GetChild(backBox + 2).gameObject.SetActive(true);
+            //             }
+            //         }
+            //     }
+            // }
+        */
+     
+            UpdateNodes();
+            UpdateTimelineSlider();
+            UpdateTimelineNob();
+            UpdateTrackScroll();
+            UpdateUI();
+            App.Scene.TriggerLayersUpdate();
+        }
+
+        private void UpdateNodes()
+        {           
+            // TODO: Need to refactor, I think. This is gross...
+            int nodeCount; // always 8, unless we increase fps
+            int trackFrameCount;
+            int nodeToMake; // 9 - 8
+
+            nodeCount = frameNotchesWidget.gameObject.transform.childCount; // always 8, unless we increase fps
+            trackFrameCount = GetTimelineLength();
+            nodeToMake = trackFrameCount - nodeCount; // 9 - 8
+
+            if (nodeToMake > 0)
+            {
+                float posModifier = nodeCount; 
+                for (int make = 0; make < nodeToMake ; make++)
+                {
+                    GameObject newFrame = Instantiate(timelineNotchPrefab, frameNotchesWidget.transform, false); // SOME FUNKINESS IN-EDITOR. If you encounter a bug, re-assign the prefab on the exposed list in the Inspector.
+                    // HARD CODED. MUST GET Vector and Scale info from FrameButton1
+                    newFrame.transform.localPosition = new Vector3(posModifier  * 0.1971429f , 0 , 0.0087f); // 1.9... is the spacing between framebuttons 0 and 1
+                    newFrame.transform.FindChild("Num").GetComponent<TextMeshPro>().text = "" + posModifier;  
+
+                    posModifier = posModifier + 1;
+                }
+            }
+
             List<Track> ActiveTrack = new();
-
             foreach (Track track in Timeline)
             { 
                 if (!track.Deleted){
-                    //Debug.Log("track.GetHashCode() " + track.GetHashCode());
                     ActiveTrack.Add(track);
-                    trackCount += 1;
                 }
             }
 
-            Debug.Log("Active Track Count: " + trackCount);
- 
-            int loopLimitTrack = Math.Min(trackNodesWidget.Count,ActiveTrack.Count);
-            Debug.Log("loopLimitTrack " + loopLimitTrack);
-
-            for (int i = 0; i < loopLimitTrack; i++)
+            foreach (GameObject trackNodes in trackNodesWidget)
             {
-                Debug.Log("ActiveTrack[i].Frames.Count " + ActiveTrack[i].Frames.Count);
-                if (ActiveTrack[i].Frames.Count > 0) // check if there is a frame here.
-                {
-                    trackNodesWidget[i].SetActive(true);
-
-                    int loopLimitFrames = Math.Min(trackNodesWidget[i].gameObject.transform.childCount,ActiveTrack[i].Frames.Count);
-                    for (int j = 0; j < loopLimitFrames ; j++)
-                    {
-                        var frameButton = trackNodesWidget[i].transform.GetChild(j);
-                        frameButton.gameObject.SetActive(true);
-                        
-                        Debug.Log("frameButton.childCount " + frameButton.childCount);
-
-                        Debug.Log("ActiveTrack[i].Frames[j].GetHashCode() " + ActiveTrack[i].Frames[j].GetHashCode());
-                    }
-                } else {
-                    trackNodesWidget[i].SetActive(false);                   
-                }
-
-                //// OUT OF INDEX ERROR
-                // if (ActiveTrack[i + 1].Frames.Count > 0) // check if there is a frame here. 
-                // {
-                //     int frameCount = ActiveTrack[i + 1].Frames.Count;
-                //     trackNodesWidget[i].SetActive(true);
-
-                //     for (int j = 0; j < frameCount; j++)
-                //     {
-                //         var frameButton = trackNodesWidget[i].transform.GetChild(j);
-                //         frameButton.gameObject.SetActive(true);
-
-                //         Debug.Log("ActiveTrack[i].Frames[j].GetHashCode() " + ActiveTrack[i].Frames[j].GetHashCode());
-                //     }
-
-                // }
-            }
-        }
-
-        public void ResetTimeline()
-        {
-            if (timelineNotches != null)
-            {
-                foreach (var notch in timelineNotches)
-                {
-                    Destroy(notch);
-                }
-            }
-            if (timelineFrameObjects != null)
-            {
-                foreach (var frame in timelineFrameObjects)
-                {
-                    Destroy(frame);
-                }
-            }
-            foreach (Transform thisObj in timelineField.transform)
-            {
-                Destroy(thisObj.gameObject);
+                trackNodes.SetActive(false);
             }
 
-            timelineNotches = new List<GameObject>();
-            timelineFrameObjects = new List<GameObject>();
-
-            int timelineLength = GetTimelineLength();
-            for (int f = 0; f < timelineLength; f++)
+            int loopLimitTrack = Math.Min(ActiveTrack.Count,trackNodesWidget.Count);
+            for (int trackNum = 0; trackNum < loopLimitTrack; trackNum++)
             {
-                GameObject newNotch = Instantiate(timelineNotchPrefab);
-                newNotch.transform.FindChild("Num").GetComponent<TextMeshPro>().text = "" + f;
-                newNotch.transform.SetParent(timelineRef.transform);
-                newNotch.SetActive(false);
-                timelineNotches.Add(newNotch);
-                GameObject newFrame = Instantiate(timelineFramePrefab, timelineField.transform, false);
-                timelineFrameObjects.Add(newFrame);
-                newFrame.name = "FrameContainer_" + f.ToString();
-
-                GameObject frameWrapper = newFrame.transform.GetChild(0).gameObject;
-
-                int numDeleted = 0;
-
-                for (int i = frameWrapper.transform.childCount - 1; i >= 0; i--)
+                if (ActiveTrack[trackNum].Frames.Count > 0) // check if there is a frame here.
                 {
-                    Destroy(frameWrapper.transform.GetChild(i).gameObject);
-                }
+                    trackNodesWidget[trackNum].SetActive(true);
 
-                for (int i = 0; i < Timeline.Count; i++)
-                {
-                    numDeleted += Timeline[i].Deleted ? 1 : 0;
-                    int trackOn = i - numDeleted;
-                    if (trackOn < Timeline.Count && !Timeline[i].Deleted)
-                    {
-                        var newButton = Instantiate(frameButtonPrefab, frameWrapper.transform, false);
-                        var frameButton = newButton.transform.GetChild(0);
+                    nodeCount = trackNodesWidget[trackNum].gameObject.transform.childCount; // always 8, unless we increase fps
+                    trackFrameCount = ActiveTrack[trackNum].Frames.Count;
+                    nodeToMake = trackFrameCount - nodeCount; // 9 - 8
 
-                        frameButton.GetComponent<MeshRenderer>().enabled = false;
-                        frameButton.localPosition = new Vector3(0.00538007962f, 0.449999988f - m_FrameOffset * trackOn, 0);
-                        frameButton.gameObject.SetActive(true);
-
-                        frameButton.gameObject.GetComponent<FrameButton>().SetButtonCoordinate(i, f);
-
-                        // Hide all ui indicators first
-                        for (int o = 0; o < frameButton.GetChildCount(); o++)
+                        if (nodeToMake > 0)
                         {
-                            frameButton.GetChild(o).gameObject.SetActive(false);
-
-                            if (Timeline[i].Frames[f].AnimatedPath != null && frameButton.GetChild(o).gameObject.GetComponent<SpriteRenderer>() != null)
+                            double posModifier = nodeCount; 
+                            for (int make = 0; make < nodeToMake ; make++)
                             {
-                                frameButton.GetChild(o).gameObject.GetComponent<SpriteRenderer>().color = new Color(92f / 255f, 52f / 255f, 237f / 255f);
-                                Timeline[i].Frames[f].AnimatedPath.gameObject.SetActive(Timeline[i].Frames[f].Canvas.Equals(App.Scene.ActiveCanvas));
+                                GameObject newFrame = Instantiate(frameButtonPrefab, trackNodesWidget[trackNum].transform, false);
+                                // TODO : HARD CODED. MUST GET Vector and Scale info from FrameButton1
+                                newFrame.transform.localPosition = new Vector3((float)posModifier  * (float)0.1971429 , 0 , -0.029f); // 1.9... is the spacing between framebuttons 0 and 1
+                                float scale = 0.16175f;
+                                newFrame.transform.localScale = new Vector3(scale,scale,scale);
+                                posModifier = posModifier + 1;
                             }
+                        } 
+
+                        for (int hideNode = 0; hideNode < nodeCount ; hideNode++)
+                        {
+                            // trackNodesWidget[trackNum].transform.GetChild(hideNode).gameObject.SetActive(false); // already handled in UpdateTimelineSlider below
+                            foreach (Transform buttonState in trackNodesWidget[trackNum].transform.GetChild(hideNode).GetChild(0)) // hide all button state
+                                {
+                                    buttonState.gameObject.SetActive(false); // trackNodesWidget[t].transform.GetChild(hideNode).GetChild(0).GetChild(X).gameObject.SetActive(false); 
+                                }
                         }
 
-                        bool filled = GetFrameFilled(i, f);
+                    int loopLimitFrames = Math.Min(nodeCount , trackFrameCount);
+                    for (int frameNum = 0; frameNum < loopLimitFrames ; frameNum++)
+                    {
+                        // trackNodesWidget[trackNum].transform.GetChild(frameNum).gameObject.SetActive(true); // already handled in UpdateTimelineSlider below
+                        var frameButton = trackNodesWidget[trackNum].transform.GetChild(frameNum).GetChild(0); // f is tracknodes; 0 is the control, which is labled "1" in the prefab
+                        int scrolledTrack = trackNum + Math.Abs(m_TrackScrollOffset); // TODO : May need to instantiate tracks and hide them as we go at UpdateTimelineSlider when toggling pages
+
+                        frameButton.gameObject.GetComponent<FrameButton>().SetButtonCoordinate(scrolledTrack, frameNum); // 0 is the "1" that contains the FrameButton component.
+
+                        //// COPY/PASTE FROM OG. Begin setting the button formatting.
+                        bool filled = GetFrameFilled(scrolledTrack, frameNum); // using boolean as an ON and OFF switch. So buttonState index 0 and 1.
                         bool backwardsConnect;
                         bool forwardConnect;
 
-                        backwardsConnect = (f > 0 && Timeline[i].Frames[f].Canvas.Equals(Timeline[i].Frames[f - 1].Canvas));
-                        forwardConnect = (f < Timeline[i].Frames.Count - 1 && Timeline[i].Frames[f].Canvas.Equals(Timeline[i].Frames[f + 1].Canvas));
+                        backwardsConnect = (frameNum > 0 && Timeline[scrolledTrack].Frames[frameNum].Canvas.Equals(Timeline[scrolledTrack].Frames[frameNum - 1].Canvas));
+                        forwardConnect = (frameNum < Timeline[scrolledTrack].Frames.Count - 1 && Timeline[scrolledTrack].Frames[frameNum].Canvas.Equals(Timeline[scrolledTrack].Frames[frameNum + 1].Canvas));
                         frameButton.GetChild(Convert.ToInt32(filled)).gameObject.SetActive(true);
 
-                        int backBox = 6;
+                        int backBox = 6; // buttonState index 6
                         frameButton.GetChild(backBox).gameObject.SetActive(true);
 
                         // Set behind colours depending whether frame is active
                         Color backColor;
                         if (filled)
                         {
-                            if (Timeline[i].Frames[f].Canvas.Equals(App.Scene.ActiveCanvas))
+                            if (Timeline[scrolledTrack].Frames[frameNum].Canvas.Equals(App.Scene.ActiveCanvas))
                             {
-                                backColor = new Color(150 / 255f, 150 / 255f, 150 / 255f);
+                                backColor = new Color(150 / 255f, 150 / 255f, 150 / 255f); // neutralgray
                             }
                             else
                             {
-                                backColor = new Color(0 / 255f, 0 / 255f, 0 / 255f);
+                                backColor = new Color(0 / 255f, 0 / 255f, 0 / 255f); // black
                             }
                         }
                         else
                         {
                             (int, int) index = GetCanvasLocation(App.Scene.ActiveCanvas);
-                            if (index.Item1 == i && f == FrameOn)
+                            if (index.Item1 == scrolledTrack && frameNum == FrameOn)
                             {
-                                backColor = new Color(150 / 255f, 150 / 255f, 150 / 255f);
+                                backColor = new Color(150 / 255f, 150 / 255f, 150 / 255f); // neutralgray
                             }
                             else
                             {
-                                backColor = new Color(0 / 255f, 0 / 255f, 0 / 255f);
+                                backColor = new Color(0 / 255f, 0 / 255f, 0 / 255f); // black
                             }
                         }
 
@@ -556,26 +643,18 @@ namespace TiltBrush.FrameAnimation
 
                         if (backwardsConnect)
                         {
-                            frameButton.GetChild(Convert.ToInt32(filled) + 2).gameObject.SetActive(true);
-                            frameButton.GetChild(backBox + 1).gameObject.SetActive(true);
+                            frameButton.GetChild(Convert.ToInt32(filled) + 2).gameObject.SetActive(true); // buttonState index 2 or 3; respectively empty connect left, filled connect left
+                            frameButton.GetChild(backBox + 1).gameObject.SetActive(true); // buttonState index 7: back box left
                         }
 
                         if (forwardConnect)
                         {
-                            frameButton.GetChild(Convert.ToInt32(filled) + 4).gameObject.SetActive(true);
-                            frameButton.GetChild(backBox + 2).gameObject.SetActive(true);
-                        }
+                            frameButton.GetChild(Convert.ToInt32(filled) + 4).gameObject.SetActive(true); // buttonState index 4 or 5; respectively empty connect right, filled connect right 
+                            frameButton.GetChild(backBox + 2).gameObject.SetActive(true); // buttonState index 8: back box right
+                        } 
                     }
-                }
+                } 
             }
-
-            UpdateTimelineSlider();
-            UpdateTimelineNob();
-            UpdateTrackScroll();
-            UpdateUI();
-            App.Scene.TriggerLayersUpdate();
-
-            TESTResetTimeline();
         }
 
         public void UpdateTrackScroll(int scrollOffset, float scrollHeight)
@@ -640,32 +719,56 @@ namespace TiltBrush.FrameAnimation
         public void UpdateTimelineSlider()
         {
             float meshLength = timelineRef.GetComponent<TimelineSlider>().m_MeshScale.x;
-            float startX = -meshLength / 2f - m_TimelineOffset * meshLength;
+            // float startX = -meshLength / 2f - m_TimelineOffset * meshLength;
 
-            int timelineLength = GetTimelineLength();
-            for (int f = 0; f < timelineLength; f++)
+            // int timelineLength = GetTimelineLength();
+            // for (int f = 0; f < timelineLength; f++)
+            // {
+            //     float thisOffset = ((float)(f)) * m_SliderFrameSize * meshLength;
+
+            //     float notchOffset = startX + ((float)(f)) * m_SliderFrameSize * meshLength;
+            //     if (timelineNotches.ElementAtOrDefault(f) != null)
+            //     {
+            //         GameObject notch = timelineNotches[f];
+            //         notch.transform.localPosition = new Vector3(notchOffset, 0, 0);
+            //         notch.transform.localRotation = Quaternion.identity;
+            //         notch.SetActive(notchOffset >= -meshLength * 0.5 && notchOffset <= meshLength * 0.5);
+            //     }
+
+            //     if (timelineFrameObjects.ElementAtOrDefault(f) != null)
+            //     {
+            //         Vector3 newPosition = timelineFrameObjects[f].transform.localPosition;
+            //         float width = timelineFrameObjects[f].transform.GetChild(0).localScale.x;
+            //         newPosition.x = thisOffset - m_TimelineOffset * meshLength - width * 0.5f;
+            //         timelineFrameObjects[f].transform.localPosition = new Vector3(newPosition.x, 0, 0);
+            //         timelineFrameObjects[f].transform.localRotation = Quaternion.identity;
+            //         timelineFrameObjects[f].SetActive(newPosition.x >= -0.1 && newPosition.x <= meshLength - width);
+            //     }
+            // }
+
+            for (int t = 0 ; t < timelineField.transform.childCount ; t++)
             {
-                float thisOffset = ((float)(f)) * m_SliderFrameSize * meshLength;
+                Transform trackT = timelineField.transform.GetChild(t);
+                Vector3 newPosition;
+                Quaternion quaternion;
+                trackT.GetLocalPositionAndRotation(out newPosition, out quaternion);
+            
+                newPosition.x = (-m_TimelineOffset * meshLength) - 0.8f; // 1.64567f is mesh length; -0.8f is the X position on the prefab
+                                                                            // TODO: probably need to get a global for this...
+                
+                trackT.localPosition = newPosition; // previous -> new Vector3(newPosition.x, newPosition.y, newPosition.z);
+                trackT.localRotation = quaternion; // previous -> Quaternion.identity;
 
-                float notchOffset = startX + ((float)(f)) * m_SliderFrameSize * meshLength;
-                if (timelineNotches.ElementAtOrDefault(f) != null)
+                // {{YOU ARE HERE}} adding this to ResetTimeline won't work as it will not update when scrolling. Keep it as is.
+                for (int f = 0 ; f < trackT.transform.childCount ; f++)
                 {
-                    GameObject notch = timelineNotches[f];
-                    notch.transform.localPosition = new Vector3(notchOffset, 0, 0);
-                    notch.transform.localRotation = Quaternion.identity;
-                    notch.SetActive(notchOffset >= -meshLength * 0.5 && notchOffset <= meshLength * 0.5);
-                }
+                    Vector3 nodeVector = trackT.GetChild(f).transform.position;
+                    Vector3 relativePosition = timelineField.transform.InverseTransformPoint(nodeVector);
 
-                if (timelineFrameObjects.ElementAtOrDefault(f) != null)
-                {
-                    Vector3 newPosition = timelineFrameObjects[f].transform.localPosition;
-                    float width = timelineFrameObjects[f].transform.GetChild(0).localScale.x;
-                    newPosition.x = thisOffset - m_TimelineOffset * meshLength - width * 0.5f;
-                    timelineFrameObjects[f].transform.localPosition = new Vector3(newPosition.x, 0, 0);
-                    timelineFrameObjects[f].transform.localRotation = Quaternion.identity;
-                    timelineFrameObjects[f].SetActive(newPosition.x >= -0.1 && newPosition.x <= meshLength - width);
+                    trackT.GetChild(f).gameObject.SetActive(relativePosition.x >= -0.85f && relativePosition.x <= 0.85f);
                 }
             }
+
         }
 
         public void SelectTimelineFrame(int trackNum, int frameNum)
@@ -946,7 +1049,7 @@ namespace TiltBrush.FrameAnimation
                 if (nextIndex.Item2 >= Timeline[nextIndex.Item1].Frames.Count)
                 {
                     Debug.Log("public (int, int) MoveKeyFrame" + " : AddCanvas function will run");
-                    Frame emptyFrame = NewFrame(App.Scene.AddCanvas(index.Item1, index.Item2)); // is that correct?
+                    Frame emptyFrame = NewFrame(App.Scene.AddCanvas()); // is that correct?
                     Frame movedFrame = Timeline[index.Item1].Frames[index.Item2];
                     Timeline[index.Item1].Frames[index.Item2] = emptyFrame;
                     Timeline[nextIndex.Item1].Frames.Insert(Timeline[nextIndex.Item1].Frames.Count, movedFrame);
@@ -1046,6 +1149,7 @@ namespace TiltBrush.FrameAnimation
                 insertingAt = nextIndex;
             }
 
+            ResetTimeline();
             FillTimeline();
             SelectTimelineFrame(nextIndex.Item1, nextIndex.Item2);
             return insertingAt;
@@ -1212,10 +1316,6 @@ namespace TiltBrush.FrameAnimation
 
         public (int, int) SplitKeyFrame(int trackNum = -1, int frameNum = -1)
         {
-            if (trackNum == 0){
-                Debug.Log("Modifying MainCanvas that's not extending/reducing. DON'T DO THAT!");
-            }
-
             (int, int) index = (trackNum == -1 || frameNum == -1) ? GetCanvasLocation(App.Scene.ActiveCanvas) : (trackNum, frameNum);
 
             Debug.Log("public (int, int) splitKeyFrame" + " : AddCanvas function will run");
@@ -1398,6 +1498,12 @@ namespace TiltBrush.FrameAnimation
             m_LastCanvas = App.Scene.ActiveCanvas;
 
             int currentBatchPools = App.Scene.ActiveCanvas.BatchManager.GetNumBatchPools();
+
+            if (m_TrackScrollOffset != m_previousTrackScrollOffset)
+            {
+                m_previousTrackScrollOffset = m_TrackScrollOffset;
+                ResetTimeline();
+            }
 
             if (currentBatchPools != 0 && m_PreviousCanvasBatches != currentBatchPools)
             {
