@@ -274,19 +274,6 @@ namespace TiltBrush
             return frame;
         }
 
-
-        public CanvasScript AddCanvas(int intTrack, int intFrame)
-        {
-            string name = string.Format("Track {0} Frame {1}", intTrack, intFrame);
-            var go = new GameObject(name);
-            go.transform.parent = transform;
-            Coords.AsLocal[go.transform] = TrTransform.identity;
-            go.transform.hasChanged = false;
-            HierarchyUtils.RecursivelySetLayer(go.transform, App.Scene.MainCanvas.gameObject.layer);
-            var frame = go.AddComponent<CanvasScript>();
-            return frame;
-        }
-
         public void DestroyCanvas(CanvasScript layer)
         {
             foreach (Batch b in layer.BatchManager.AllBatches())
@@ -455,6 +442,8 @@ namespace TiltBrush
         public void MarkLayerAsNotDeleted(CanvasScript layer)
         {
             m_DeletedLayers.Remove(GetIndexOfCanvas(layer).Item1 - 1);
+            animationUI_manager.MarkLayerAsNotDeleteRefresh(layer);
+
             App.Scene.LayerCanvasesUpdate?.Invoke();
         }
 
@@ -486,20 +475,23 @@ namespace TiltBrush
 
         public AnimationMetadata AnimationTracksSerialized()
         {
+            // Even if we filter out DELETED tracks, it still has some misalignment.
             var meta = new AnimationMetadata();
             var layers = LayerCanvases.ToArray();
-            meta.Tracks = new AnimationTrackMetadata[layers.Length];
+            meta.Tracks = new AnimationTrackMetadata[layers.Length]; // THIS IS WHERE IT IS!!! Tracks are limited to the layer count
 
             var timeline = animationUI_manager.Timeline;
+            List<int> activeTrackIndexes = animationUI_manager.ActiveTrackIndexes();
+            // {{YOU ARE HERE}} Need to update metadata to account for deleted frames
             for (var i = 0; i < layers.Length; i++)
             {
                 var layer = layers[i];
                 var frameLengthsFound = new List<int>();
-                for (var f = 0; f < timeline[i].Frames.Count; f++)
+                for (var f = 0; f < timeline[activeTrackIndexes[i]].Frames.Count; f++)
                 {
                     if (f > 0)
                     {
-                        if (timeline[i].Frames[f].Canvas.Equals(timeline[i].Frames[f - 1].Canvas))
+                        if (timeline[activeTrackIndexes[i]].Frames[f].Canvas.Equals(timeline[activeTrackIndexes[i]].Frames[f - 1].Canvas))
                         {
                             frameLengthsFound[frameLengthsFound.Count - 1]++;
                         }
@@ -521,7 +513,8 @@ namespace TiltBrush
                 };
             }
 
-            meta.numFrames = animationUI_manager.Timeline.Count;
+            //meta.numFrames = animationUI_manager.Timeline.Count;
+            meta.numFrames = activeTrackIndexes.Count;
             return meta;
         }
     }
